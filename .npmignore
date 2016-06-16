@@ -1,2 +1,3 @@
+examples/
 npm-debug.log
 .travis.yml
