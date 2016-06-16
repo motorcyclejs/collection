@@ -34,6 +34,8 @@
     "@most/hold": "*"
   },
   "devDependencies": {
+    "most": "*",
+    "immutable": "*",
     "@most/hold": "*",
     "babel-cli": "^6.7.5",
     "babel-eslint": "^6.0.3",
