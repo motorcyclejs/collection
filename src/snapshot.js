@@ -78,9 +78,8 @@ function addItem(state, itemKey, sinks, index) {
 }
 
 function removeItems(state, removed) {
-  const values = state.values;
   for(let key of removed.keys()) {
-    state.values = values.delete(key);
+    state.values = state.values.delete(key);
     state.pending.delete(key);
   }
 }
