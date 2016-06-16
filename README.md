@@ -129,7 +129,7 @@ function Content(sources) {
 }
 
 function App(sources) {
-  const header = Content(sources);
+  const header = Header(sources);
   const navigation = Navigation(sources);
   const content = Content(sources);
 
@@ -142,7 +142,7 @@ function App(sources) {
   const components = Collection()
     .setInstance('header', header)
     .setInstance('nav', navigation)
-    .setInstance('main', mainView);
+    .setInstance('content', content);
 
   // Now that the collection is managing our child components, we can combine
   // the views easily and use them as part of our app view. The `combineObject`
@@ -151,7 +151,7 @@ function App(sources) {
   // for latest value emitted by each component.
 
   const view$ = components.combineObject('DOM')
-    .map(({header, nav, main}) => div('.container', [header, nav, main]));
+    .map(({header, nav, content}) => div('.container', [header, nav, content]));
 
   return {
     DOM: view$
@@ -169,22 +169,7 @@ object of key/value pairs, like so:
 
 ```js
 const view$ = components.combineArray('DOM')
-  .map(([header, nav, main]) => div('.container', [header, nav, main]));
-```
-
-If our components are identified using keys where the data type of the key is important and
-we'd prefer not to have them turned into strings (as per `combineObject`) or discarded (via `combineArray`), we can use `combineMap`, which will give us a native `Map` object, with the
-component id as the map key:
-
-```js
-const view$ = components.combineMap('DOM')
-  .map(views =>
-    div('.container', [
-      views.get('header'),
-      views.get('nav'),
-      views.get('main')
-    ])
-  );
+  .map(([header, nav, content]) => div('.container', [header, nav, content]));
 ```
 
 ### Replacing a child component when state changes
