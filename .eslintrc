@@ -1,0 +1,30 @@
+{
+  "parser": "babel-eslint",
+  "env": {
+    "es6": true,
+    "commonjs": true,
+    "shared-node-browser": true
+  },
+  "parseOptions": {
+    "ecmaVersion": 6,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "experimentalObjectRestSpread": true,
+      "modules": true
+    }
+  },
+  "rules": {
+    "brace-style": [2, "stroustrup", { "allowSingleLine": true }],
+    "eol-last": 0,
+    "new-cap": 0,
+    "no-undef": 2,
+    "no-underscore-dangle": 0,
+    "no-unused-vars": [1, {"vars": "all", "args": "none"}],
+    "no-use-before-define": [2, {"functions": false, "classes": false}],
+    "object-curly-spacing": [2, "never"],
+    "array-bracket-spacing": [2, "never"],
+    "quotes": [1, "single", "avoid-escape"],
+    "semi": [2, "always"],
+    "strict": 0
+  }
+}
