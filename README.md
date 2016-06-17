@@ -393,12 +393,14 @@ function emitVideoProps(video) {
 const emptyList = Collection({
   types: [{
     key: 'video',
-    fn: VideoComponent,
-    instantiate: (video, type, list) => ({
-      ...list.sources,
-      ...type.sources,
-      props$: emitVideoProps(video),
-    })
+    instantiate: (video, type, list) => {
+      const sources = {
+        ...list.sources,
+        ...type.sources,
+        props$: emitVideoProps(video)
+      };
+      return VideoComponent(sources);
+    }
   }]
 });
 
@@ -406,9 +408,9 @@ const emptyList = Collection({
 const newList = emptyList.add('video', {title: 'To Kill A Mockingbird', year: 1962});
 ```
 
-And of course you could do the equivalent using the `define` function.
+Notice that the `fn` property has been omitted, as the custom `instantiate` function calls the component function directly. The reason you normally need to specify the component function when defining a type is because otherwise the `Collection` instance won't know how to create your sinks when you pass it a new input, and the default implementation of the `instantiate` function looks for the `fn` property.
 
-Because you can define component types by passing in your own type definition object, you can easily attach additional context data to the type definition and it'll be available during component instantiation. The same is true of the collection options provided when creating the collection.
+Naturally you could also do the equivalent of the above example, but via the `define` function.
 
 ## API Reference
 
