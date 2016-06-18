@@ -138,37 +138,6 @@ export class Collection
           : defaultCollectionState;
   }
 
-  static _extractStreamArray(key, list$) {
-    return list$
-      .switch()
-      .map(list => {
-        return list
-          .map(item => item.sinks[key])
-          .filter(hasValue);
-      });
-  }
-
-  static combine(key, list$) {
-    return most
-      .combineArray((...args) => args, Collection._extractStreamArray(key, list$))
-      .thru(hold);
-  }
-
-  static merge(key, list$) {
-    if(Array.isArray(key)) {
-      return Collection.sinks(key, list$);
-    }
-  }
-
-  static sinks(keys, list$) {
-    return list$
-      .switch()
-      .map(list => list.state.get('items')
-        .reduce((arrays, item) =>
-          keys.reduce((acc, key) => ((item.sinks[key] ? acc[key].push(item.sinks[key]) : void 0), acc), arrays),
-          keys.reduce((acc, key) => (acc[key] = [], acc), {})));
-  }
-
   _getType(typeKey, allowThrow) {
     const type = this.state.getIn(['types', typeKey]);
     if(allowThrow && !type) {

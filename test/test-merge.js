@@ -71,6 +71,17 @@ describe('Collection', () => {
           assert(result.end);
         });
     });
+
+    it('should not emit data from sinks that did not match the specified key', () => {
+        const list$ = most.just(list);
+        const bar$ = Collection.merge('none', list$);
+        const env = run(bar$);
+        return env.tick(1)
+          .then(result => {
+            assert(result.events.length === 0);
+            assert(result.end);
+          });
+    });
     
     describe('when no lists have been emitted yet', () => {
       it('should not emit anything', () => {
@@ -176,6 +187,23 @@ describe('Collection', () => {
         .then(results => {
           assert.deepEqual(results.slice(0, 2), results.slice(2, 4));
         });
+    });
+
+    it('should not emit data from sinks that did not match the specified keys', () => {
+        const list$ = most.just(list);
+        const sinks = Collection.merge(['none', 'zero'], list$);
+        const env1 = run(sinks.none);
+        const env2 = run(sinks.zero);
+        return env1.tick(1)
+          .then(result => {
+            assert(result.events.length === 0);
+            assert(result.end);
+            return env2.tick(1);
+          })
+          .then(result => {
+            assert(result.events.length === 0);
+            assert(result.end);
+          });
     });
   });
 });
