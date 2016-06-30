@@ -1,3 +1,4 @@
+import Immutable from 'immutable';
 import most from 'most';
 import {isStream, isSinks} from './common';
 import {Collection} from './collection';
@@ -20,6 +21,14 @@ export function combineObject(...args) {
 
 export function isCollection(arg) {
   return arg instanceof Collection;
+}
+
+export function areCollectionsEqual(a, b) {
+  return Immutable.is(a.state, b.state);
+}
+
+export function areCollectionItemsEqual(a, b) {
+  return Immutable.is(a.state.get('items'), b.state.get('items'));
 }
 
 function exec(keyFn, keysFn, args) {

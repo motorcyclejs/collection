@@ -1,6 +1,6 @@
 {
   "name": "@motorcycle/collection",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Simple-but-versatile helper for adding, updating, removing, merging and combining both static and dynamic lists of child components in a Cycle.js application",
   "repository": "https://github.com/motorcyclejs/collection",
   "main": "lib/index.js",
