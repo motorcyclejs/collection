@@ -171,6 +171,7 @@ class SwitchCollectionSink
     }
     const changes = calculateDiff(this._sinkKeys, this._list, list);
     this._list = list;
+    this._sink.event(t, {list, changes});
     if(changes) {
       this._sinkKeys.forEach(sinkKey => {
         changes.removed.forEach((_, itemKey) => {
@@ -184,7 +185,6 @@ class SwitchCollectionSink
         });
       });
     }
-    this._sink.event(t, {list, changes});
   }
 
   end(t, x) {
