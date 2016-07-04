@@ -5,3 +5,5 @@ export function isStream(arg) {
 export function isSinks(arg) {
   return arg && typeof arg === 'object' && !Array.isArray(arg);
 }
+
+export const placeholderSymbol = Symbol('placeholder');

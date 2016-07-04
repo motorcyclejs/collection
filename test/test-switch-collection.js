@@ -2,6 +2,7 @@ import assert from 'power-assert';
 import most from 'most';
 import Collection from '../src';
 import switchCollection from '../src/switch-collection';
+import {placeholderSymbol} from '../src/common';
 import {run} from 'most-test';
 import {isStream, counter} from './helpers';
 
@@ -81,13 +82,13 @@ describe('switchCollection(keys, stream)', () => {
             });
         });
 
-        it('should emit an initial null value for each missing sink, so as not to block snapshots', () => {
+        it('should emit an initial placeholder value for each missing sink, so as not to block snapshots', () => {
           return init().tick(1)
             .then(result => {
               assert(result.events.length === 2);
               assert(Collection.isCollection(result.events[0].list));
               assert(result.events[1][1] === 'bar');
-              assert(result.events[1][2] === null);
+              assert(result.events[1][2] === placeholderSymbol);
             });
         });
       });

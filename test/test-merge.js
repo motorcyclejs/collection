@@ -112,13 +112,13 @@ describe('Collection', () => {
         const list2 = list.removeAt(0);
         const list$ = most.just(list2).delay(4).startWith(list);
         const env = run(Collection.merge('bar', list$));
-        return env.tick(2)
+        return env.tick(3)
           .then(result => {
-            assert.deepEqual(result.events, ['y20', 'z0', 'y21', 'z1', 'y22']);
-            return env.tick(2);
+            assert.deepEqual(result.events, ['y20', 'z0', 'y21', 'z1', 'y22', 'z2', 'y23']);
+            return env.tick(3);
           })
           .then(result => {
-            assert.deepEqual(result.events, ['z2', 'y23', 'z0']);
+            assert.deepEqual(result.events, ['z3', 'z4', 'z5']);
           });
       });
 
@@ -134,7 +134,7 @@ describe('Collection', () => {
             return env.tick(1);
           })
           .then(result => {
-            assert.deepEqual(result.events, ['y20', 'z0', 'new']);
+            assert.deepEqual(result.events, ['z3', 'y24', 'new']);
           });
       });
     });
@@ -190,20 +190,20 @@ describe('Collection', () => {
     });
 
     it('should not emit data from sinks that did not match the specified keys', () => {
-        const list$ = most.just(list);
-        const sinks = Collection.merge(['none', 'zero'], list$);
-        const env1 = run(sinks.none);
-        const env2 = run(sinks.zero);
-        return env1.tick(1)
-          .then(result => {
-            assert(result.events.length === 0);
-            assert(result.end);
-            return env2.tick(1);
-          })
-          .then(result => {
-            assert(result.events.length === 0);
-            assert(result.end);
-          });
+      const list$ = most.just(list);
+      const sinks = Collection.merge(['none', 'zero'], list$);
+      const env1 = run(sinks.none);
+      const env2 = run(sinks.zero);
+      return env1.tick(1)
+        .then(result => {
+          assert(result.events.length === 0);
+          assert(result.end);
+          return env2.tick(1);
+        })
+        .then(result => {
+          assert(result.events.length === 0);
+          assert(result.end);
+        });
     });
   });
 });

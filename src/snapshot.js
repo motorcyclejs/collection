@@ -16,6 +16,7 @@
 */
 
 import Immutable from 'immutable';
+import {placeholderSymbol} from './common';
 
 export default function snapshot(stream) {
   return stream.loop(applySwitchCollectionEvent, {
@@ -56,9 +57,11 @@ function applyListChangesToState(state, event) {
   state.values = state.values.sort((a, b) => a.get('index') - b.get('index'));
 }
 
+const valueOf = data => data === placeholderSymbol ? void 0 : data;
+
 function applyDataEventToState(state, [itemKey, sinkKey, data]) {
   setSinkResolved(state, itemKey, sinkKey);
-  state.values = state.values.setIn([itemKey, 'sinks', sinkKey], data);
+  state.values = state.values.setIn([itemKey, 'sinks', sinkKey], valueOf(data));
 
   return {
     seed: state,

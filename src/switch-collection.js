@@ -28,8 +28,9 @@
 import most from 'most';
 import Collection from './index';
 import {calculateDiff} from './diff';
+import {placeholderSymbol} from './common';
 
-const defaultMissingSink = most.just(null);
+const defaultMissingSink = most.just(placeholderSymbol);
 
 export default function switchCollection(keys, list$) {
   if(!list$ || !list$.source) {

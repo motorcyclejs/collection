@@ -54,7 +54,7 @@ describe('snapshot(keys, stream)', () => {
             assert(changes[0].sinks.foo === 1);
             assert(changes[0].sinks.bar === 3);
             assert(changes[1].sinks.foo === 2);
-            assert(changes[1].sinks.bar === null);
+            assert(changes[1].sinks.bar === void 0);
           });
       });
 
@@ -66,7 +66,7 @@ describe('snapshot(keys, stream)', () => {
             const changes = result.events[0].toArray().map(m => m.toJS());
             assert.deepEqual(changes, [
               {itemKey: 'a', index: 0, sinks: {foo: 1, bar: 3}},
-              {itemKey: 'b', index: 1, sinks: {foo: 2, bar: null}}
+              {itemKey: 'b', index: 1, sinks: {foo: 2, bar: void 0}}
             ]);
             return env.tick(2);
           })
@@ -75,7 +75,7 @@ describe('snapshot(keys, stream)', () => {
             const changes = result.events[0].toArray().map(m => m.toJS());
             assert.deepEqual(changes, [
               {itemKey: 'a', index: 0, sinks: {foo: 4, bar: 3}},
-              {itemKey: 'b', index: 1, sinks: {foo: 2, bar: null}}
+              {itemKey: 'b', index: 1, sinks: {foo: 2, bar: void 0}}
             ]);
             return env.tick(10);
           })
@@ -84,7 +84,7 @@ describe('snapshot(keys, stream)', () => {
             const changes = result.events[0].toArray().map(m => m.toJS());
             assert.deepEqual(changes, [
               {itemKey: 'a', index: 0, sinks: {foo: 4, bar: 3}},
-              {itemKey: 'b', index: 1, sinks: {foo: 5, bar: null}}
+              {itemKey: 'b', index: 1, sinks: {foo: 5, bar: void 0}}
             ]);
           });
       });

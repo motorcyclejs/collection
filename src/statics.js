@@ -4,6 +4,7 @@ import {isStream, isSinks} from './common';
 import {Collection} from './collection';
 import snapshot from './snapshot';
 import switchCollection from './switch-collection';
+import {placeholderSymbol} from './common';
 
 export function merge(...args) {
   return isSinks(args[0])
@@ -63,9 +64,10 @@ function mergeSinks(...args) {
 }
 
 function mergeSimple(key, list$) {
-  return list$
-    .map(list => list.merge(key))
-    .switch();
+  return switchCollection([key], list$)
+    .filter(Array.isArray)
+    .map(ev => ev[2])
+    .filter(value => value !== placeholderSymbol);
 };
 
 function mergeGrouped(keys, list$) {
