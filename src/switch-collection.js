@@ -26,26 +26,78 @@
 */
 
 import most from 'most';
+import {MulticastSource} from '@most/multicast';
 import Collection from './index';
 import {calculateDiff} from './diff';
-import {placeholderSymbol} from './common';
+import {isStream, placeholderSymbol} from './common';
+import snapshot from './snapshot';
 
 const defaultMissingSink = most.just(placeholderSymbol);
 
 export default function switchCollection(keys, list$) {
+  if(isStream(keys)) {
+    list$ = keys;
+    keys = void 0;
+  }
+
+  if(keys) {
+    if(!Array.isArray(keys) || keys.length === 0) {
+      throw new Error('The first argument to `switchCollection` must be a collection stream or an array with at least one key');
+    }
+    if(keys.some(key => typeof key !== 'string')) {
+      throw new Error('Every element in the `keys` argument must be a string');
+    }
+  }
+
   if(!list$ || !list$.source) {
-    throw new Error('The last argument to `switchCollection` must be a stream of collections');
+    throw new Error('The first or second argument to `switchCollection` must be a stream of collections');
   }
 
-  if(!Array.isArray(keys) || keys.length === 0) {
-    throw new Error('The first argument to `switchCollection` must be an array with at least one key');
+  return new CollectionStream(new SwitchCollectionSource(keys, list$.source));
+}
+
+export class CollectionStream extends most.Stream
+{
+  constructor(source) {
+    super(new MulticastSource(source));
   }
 
-  if(keys.some(key => typeof key !== 'string')) {
-    throw new Error('Every element in the `keys` argument must be a string');
+  snapshot() {
+    return snapshot(this);
   }
 
-  return new most.Stream(new SwitchCollectionSource(keys, list$.source));
+// TODO: the changes() function below should be used in conjunction with dispatch in order to get an item metatdata stream
+  changeSets() {
+    return this.filter(event => !Array.isArray(event));
+  }
+
+  changes() {
+    return this.changeSets()
+      .flatMap(({list, changes}) => {
+        const events = [];
+        changes.changed.forEach((diff, key) => events.push({
+          type: 'changed',
+          list, key, diff
+        }));
+        changes.removed.forEach(({key, index, sinks}) => events.push({
+          type: 'removed',
+          list, key, item: {index, sinks}
+        }));
+        changes.added.forEach(({key, index, sinks}) => events.push({
+          type: 'added',
+          list, key, item: {index, sinks}
+        }));
+        return most.from(events);
+      });
+  }
+
+  events(/* ...sinkKeys OR [sinkKey, ...] */) {
+    const stream = this.filter(event => Array.isArray(event));
+    const keys = arguments.length
+      ? Array.isArray(arguments[0]) ? arguments[0] : Array.from(arguments)
+      : null;
+    return keys ? stream.filter(event => keys.indexOf(event[1]) > -1) : stream;
+  }
 }
 
 class SwitchCollectionSource
@@ -174,6 +226,12 @@ class SwitchCollectionSink
     this._list = list;
     this._sink.event(t, {list, changes});
     if(changes) {
+      this._applyChanges(changes);
+    }
+  }
+
+  _applyChanges(changes) {
+    if(this._sinkKeys && this._sinkKeys.length) {
       this._sinkKeys.forEach(sinkKey => {
         changes.removed.forEach((_, itemKey) => {
           this._remove(sinkKey, itemKey);
@@ -184,6 +242,26 @@ class SwitchCollectionSink
         changes.changed.forEach((_, itemKey) => {
           this._update(sinkKey, itemKey);
         });
+      });
+    }
+    else {
+      changes.removed.forEach((diff, itemKey) => {
+        const sinks = diff.sinks;
+        for(let key in sinks) {
+          this._remove(key, itemKey);
+        }
+      });
+      changes.added.forEach((diff, itemKey) => {
+        const sinks = diff.sinks;
+        for(let key in sinks) {
+          this._add(key, itemKey);
+        }
+      });
+      changes.changed.forEach((diff, itemKey) => {
+        const sinks = diff.sinks;
+        for(let key in sinks) {
+          this._update(key, itemKey);
+        }
       });
     }
   }

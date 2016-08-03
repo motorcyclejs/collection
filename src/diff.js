@@ -1,3 +1,16 @@
+/*
+  # calculateDiff()
+
+  This function compares two collections and returns a changeset that specifies
+  which items were removed, which ones were added, and of those that remained,
+  whether their index in the collection has changed, and if any of their sinks
+  have changed. Algorithmic complexity should be O(n).
+
+  The first argument `sinkKeysWhitelist` is optional; pass a falsey value to
+  include all sink keys in the comparison.
+  
+*/
+
 export function calculateDiff(sinkKeysWhitelist, lastCollection, nextCollection) {
   const sinkKeysWhitelistSet = sinkKeysWhitelist && new Set(sinkKeysWhitelist);
   const changed = new Map();
@@ -6,7 +19,6 @@ export function calculateDiff(sinkKeysWhitelist, lastCollection, nextCollection)
 
   const itLast = lastCollection.entries();
   const itNext = nextCollection.entries();
-
 
   for(let currentLast = itLast.next(), currentNext = itNext.next(), index = 0;
       !currentNext.done || !currentLast.done;

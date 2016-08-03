@@ -9,15 +9,23 @@ import {placeholderSymbol} from './common';
 export function merge(...args) {
   return isSinks(args[0])
     ? mergeSinks(...args)
-    : exec(mergeSimple, mergeGrouped, args);
+    : exec(mergeSingle, mergeMultiple, args);
 }
 
 export function combineArray(...args) {
-  return exec(combineArraySimple, combineArrayGrouped, args);
+  return exec(combineArraySingle, combineArrayMultiple, args);
 }
 
 export function combineObject(...args) {
-  return exec(combineObjectSimple, combineObjectGrouped, args);
+  return exec(combineObjectSingle, combineObjectMultiple, args);
+}
+
+export function combineImmutable(...args) {
+  return exec(combineImmutableSingle, combineImmutableMultiple, args);
+}
+
+export function switchNext(...args) {
+  return exec(switchSingle, switchMultiple, args);
 }
 
 export function isCollection(arg) {
@@ -63,24 +71,24 @@ function mergeSinks(...args) {
   }, {});
 }
 
-function mergeSimple(key, list$) {
+function mergeSingle(key, list$) {
   return switchCollection([key], list$)
     .filter(Array.isArray)
     .map(ev => ev[2])
     .filter(value => value !== placeholderSymbol);
 };
 
-function mergeGrouped(keys, list$) {
+function mergeMultiple(keys, list$) {
   return keys.reduce((sinks, key) =>
-    ((sinks[key] = mergeSimple(key, list$)), sinks), {});
+    ((sinks[key] = mergeSingle(key, list$)), sinks), {});
 };
 
-function combineArraySimple(key, list$) {
+function combineArraySingle(key, list$) {
   return snapshot(switchCollection([key], list$))
     .map(values => values.map(m => m.getIn(['sinks', key])).toArray());
 }
 
-function combineArrayGrouped(keys, list$) {
+function combineArrayMultiple(keys, list$) {
   return snapshot(switchCollection(keys, list$))
     .map(values => values.map(m => {
       const item = {};
@@ -91,17 +99,33 @@ function combineArrayGrouped(keys, list$) {
     }).toArray());
 }
 
-function combineObjectSimple(key, list$) {
+function combineObjectSingle(key, list$) {
   return snapshot(switchCollection([key], list$))
     .map(values =>
       values.reduce((acc, m) =>
         ((acc[m.get('itemKey')] = m.getIn(['sinks', key])), acc), {}));
 }
 
-function combineObjectGrouped(keys, list$) {
+function combineObjectMultiple(keys, list$) {
   return snapshot(switchCollection(keys, list$))
     .map(values =>
       values.reduce((acc, m) =>
         ((acc[m.get('itemKey')] = keys.reduce((obj, key) =>
           ((obj[key] = m.getIn(['sinks', key])), obj), {})), acc), {}));
+}
+
+function combineImmutableSingle(key, list$) {
+  return snapshot(switchCollection([key], list$));
+}
+
+function combineImmutableMultiple(keys, list$) {
+  return snapshot(switchCollection(keys, list$));
+}
+
+function switchSingle(key, list$) {
+  return switchCollection([key], list$);
+}
+
+function switchMultiple(keys, list$) {
+  return switchCollection(keys, list$);
 }

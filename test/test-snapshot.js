@@ -5,7 +5,7 @@ import switchCollection from '../src/switch-collection';
 import snapshot from '../src/snapshot';
 import {run} from 'most-test';
 
-describe('snapshot(keys, stream)', () => {
+describe('snapshot(stream)', () => {
   describe('a stream with an initial collection', () => {
     describe('containing no items', () => {
       function init() {

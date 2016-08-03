@@ -33,7 +33,7 @@ This is a library to make management of collections of child components much eas
 - Merge children into unified groups of arbitrary sinks that the parent component can return directly or merge with its own local streams
 - Automatically project a common sink from each child to an array of the most recent values from each child component; ideal for use with `map`, `combine` and `combineArray`
 - Customizable lifecycle operations for each defined component type, including instantiation, equality and sort comparison operations
-- Well-tested with almost 200 unit tests
+- Well-tested with over 200 unit tests
 
 #### Future Enhancements
 - Support for _slice_, _skip_, _take_, _orderBy_ and _filter_ to transform the list and efficiently handle rendering, paging and filtering of very large collections and to make it possible to prevent unnecessary processing of offscreen list items

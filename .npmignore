@@ -1,3 +1,5 @@
 examples/
 .travis.yml
+.vscode/
+notes.md
 *.sublime-*

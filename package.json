@@ -48,5 +48,8 @@
     "mocha": "^2.5.3",
     "most-test": "^1.0.2",
     "power-assert": "^1.4.1"
+  },
+  "dependencies": {
+    "most-dispatch": "^1.0.0"
   }
 }

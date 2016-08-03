@@ -15,69 +15,109 @@
   will not occur until the new stream(s) emit their first item(s) of data.
 */
 
+import most from 'most';
 import Immutable from 'immutable';
-import {placeholderSymbol} from './common';
+import {isStream, placeholderSymbol} from './common';
 
-export default function snapshot(stream) {
-  return stream.loop(applySwitchCollectionEvent, {
-    initial: true,
-    pending: new Map(), // {[itemKey]: Set({sinkKey, ...}), ...}
-    values: Immutable.OrderedMap() // {[itemKey]: {itemKey, index, sinks: {[sinkKey]: value, ...}}, ...}
-  })
-  .filter(ev => ev);
+export default function snapshot() {
+  const lastArg = arguments[arguments.length - 1];
+  if(isStream(lastArg)) {
+    const keys = arguments.length > 1 ? keysFromArgs(Array.prototype.slice.call(arguments, 0, arguments.length - 1)) : null;
+    return createSnapshotStream(keys, lastArg);
+  }
+  else {
+    const keys = keysFromArgs(arguments);
+    return stream => createSnapshotStream(keys, stream);
+  }
 }
 
-function applySwitchCollectionEvent(state, event) {
-  const mutate = Array.isArray(event)
-    ? applyDataEventToState
-    : applyListChangesToState;
-  
-  const oldValues = state.values;
-  mutate(state, event);
-  const canEmit = state.pending.size === 0 && (state.initial || !Immutable.is(oldValues, state.values));
-  delete state.initial;
+function keysFromArgs(args) {
+  return Array.isArray(args[0]) ? args[0] : Array.from(args);
+}
 
-  return {
-    seed: state,
-    value: canEmit ? state.values : null
+function alwaysTrue() {
+  return true;
+}
+
+function createSnapshotStream(sinkKeys, switchCollectionStream) {
+  if(sinkKeys && !Array.isArray(sinkKeys)) {
+    sinkKeys = [sinkKeys];
+  }
+  const makeDefaults = sinkKeys ? () => sinkKeys.reduce((v, k) => (v[k] = void 0, v), {}) : () => ({});
+  const whitelist = sinkKeys && new Set(sinkKeys);
+  const isValid = whitelist ? key => whitelist.has(key) : alwaysTrue;
+  const filteredStream = switchCollectionStream
+    .loop(applySwitchCollectionEvent(isValid, makeDefaults), {
+      initial: true,
+      pending: new Map(), // {[itemKey]: Set({sinkKey, ...}), ...}
+      values: Immutable.OrderedMap() // {[itemKey]: {itemKey, index, sinks: {[sinkKey]: value, ...}}, ...}
+    })
+    .filter(ev => ev);
+  return new SnapshotStream(filteredStream.source);
+}
+
+class SnapshotStream extends most.Stream
+{
+  constructor(source) {
+    super(source);
+  }
+}
+
+function applySwitchCollectionEvent(isValidSinkKey, makeDefaultSinkValues) {
+  return (state, event) => {
+    const mutate = Array.isArray(event)
+      ? applyDataEventToState
+      : applyListChangesToState;
+    
+    const oldValues = state.values;
+    const accepted = mutate(state, event, isValidSinkKey, makeDefaultSinkValues);
+    const canEmit = accepted && state.pending.size === 0 && (state.initial || !Immutable.is(oldValues, state.values));
+    delete state.initial;
+
+    return {
+      seed: state,
+      value: canEmit ? state.values : null
+    };
   };
 }
 
-function applyListChangesToState(state, event) {
+function applyListChangesToState(state, event, isValidSinkKey, makeDefaultSinkValues) {
   if(!event.changes) {
-    return;
+    return true;
   }
 
   const {added, removed, changed} = event.changes;
+  let accepted = added.size > 0 || removed.size > 0;
 
-  added.forEach(({sinks, index}, itemKey) => addItem(state, itemKey, sinks, index));
-  changed.forEach(({sinks, index}, itemKey) => updateItem(state, itemKey, sinks, index));
+  added.forEach(({sinks, index}, itemKey) => addItem(state, itemKey, sinks, index, makeDefaultSinkValues()));
+  changed.forEach(({sinks, index}, itemKey) => {
+    if(updateItem(state, itemKey, sinks, index, isValidSinkKey) && !accepted) {
+      accepted = true;
+    }
+  });
   removeItems(state, removed);
   
   state.values = state.values.sort((a, b) => a.get('index') - b.get('index'));
+  
+  return accepted;
 }
 
 const valueOf = data => data === placeholderSymbol ? void 0 : data;
 
-function applyDataEventToState(state, [itemKey, sinkKey, data]) {
+function applyDataEventToState(state, [itemKey, sinkKey, data], isValidSinkKey) {
+  if(!isValidSinkKey(sinkKey)) {
+    return false;
+  }
   setSinkResolved(state, itemKey, sinkKey);
   state.values = state.values.setIn([itemKey, 'sinks', sinkKey], valueOf(data));
-
-  return {
-    seed: state,
-    value: nextEmission(state)
-  };
+  return true;
 }
 
-function nextEmission(state) {
-  return state.pending.size === 0 ? null : state.values;
-}
-
-function addItem(state, itemKey, sinks, index) {
+function addItem(state, itemKey, sinks, index, defaultSinkValues) {
   for(let sinkKey in sinks) {
     setSinkPending(state, itemKey, sinkKey);
   }
-  state.values = state.values.mergeDeepIn([itemKey], {itemKey, index, sinks: {}});
+  state.values = state.values.mergeDeepIn([itemKey], {itemKey, index, sinks: defaultSinkValues});
 }
 
 function removeItems(state, removed) {
@@ -87,14 +127,21 @@ function removeItems(state, removed) {
   }
 }
 
-function updateItem(state, itemKey, changedSinks, index) {
+function updateItem(state, itemKey, changedSinks, index, isValidSinkKey) {
+  let accepted = false;
+
   if(index !== void 0) {
     state.values = state.values.setIn([itemKey, 'index'], index);
+    accepted = true;
   }
   
   if(changedSinks) {
     for(let i = 0; i < changedSinks.length; i++) {
       const [sinkKey, stream] = changedSinks[i];
+      if(!isValidSinkKey(sinkKey)) {
+        continue;
+      }
+      accepted = true;
       if(stream) { // stream changed
         setSinkPending(state, itemKey, sinkKey);
       }
@@ -103,6 +150,8 @@ function updateItem(state, itemKey, changedSinks, index) {
       }
     }
   }
+
+  return accepted;
 }
 
 function setSinkResolved(state, itemKey, sinkKey) {
