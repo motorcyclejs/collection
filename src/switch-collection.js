@@ -39,6 +39,9 @@ export default function switchCollection(keys, list$) {
     list$ = keys;
     keys = void 0;
   }
+  else if(!list$) {
+    return list$ => switchCollection(keys, list$);
+  }
 
   if(keys) {
     if(!Array.isArray(keys) || keys.length === 0) {
@@ -66,9 +69,8 @@ export class CollectionStream extends most.Stream
     return snapshot(this);
   }
 
-// TODO: the changes() function below should be used in conjunction with dispatch in order to get an item metatdata stream
   changeSets() {
-    return this.filter(event => !Array.isArray(event));
+    return this.filter(event => event.changes);
   }
 
   changes() {

@@ -2,6 +2,7 @@ import most from 'most';
 import hold from '@most/hold';
 import Immutable from 'immutable';
 import {combineArray, combineObject} from './statics';
+import Snapshot from './snapshot';
 
 const nextListId = (() => {
   let _id = 0;
@@ -12,6 +13,7 @@ function hasValue(value) {
   return value;
 }
 
+const emptyMap = Immutable.Map();
 const emptyOrderedMap = Immutable.OrderedMap();
 const defaultCollectionState = Immutable.Map({
   sources: {},
@@ -97,6 +99,55 @@ function defineSources(state, sources) {
   return state.set('sources', Object.assign({}, sources));
 }
 
+function orderBySinkValue(sinkKey) {
+  return (a, b) => 0;
+}
+
+function orderBySinkValues(sinkKeys) {
+  return (a, b) => 0;
+}
+
+function defineSorting(state, orderBy) {
+  if(!orderBy) {
+    return state.delete('orderBy');
+  }
+  let fn;
+  if(typeof orderBy === 'string') {
+    fn = orderBySinkValue(orderBy);
+  }
+  else if(typeof orderBy === 'function') {
+    fn = orderBy;
+  }
+  else if(Array.isArray(orderBy)) {
+    fn = orderBySinkValues(orderBy);
+  }
+  else {
+    throw new Error('Collection options.orderBy must be a sink key, an array of sink keys, or a sort function');
+  }
+  return state.set('orderBy', fn);
+}
+
+function defineSnapshotConfig(state, snapshot) {
+  if(!snapshot) {
+    return state;
+  }
+  let sinkKeys;
+  if(snapshot === true) {
+    sinkKeys = void 0;
+  }
+  else if(typeof snapshot === 'string') {
+    sinkKeys = [snapshot];
+  }
+  else if(Array.isArray(snapshot)) {
+    sinkKeys = snapshot.length > 0 ? snapshot : void 0;
+  }
+  else {
+    throw new Error('Collection options.snapshot must be a sink key or an array of sink keys');
+  }
+
+  return state.set('snapshot', Snapshot.create(sinkKeys).state);
+}
+
 function isComponentDefinition(arg) {
   return typeof arg === 'function'
     || (arg
@@ -117,7 +168,12 @@ function applyCollectionOptions(state, options) {
   else if(typeof options !== 'object') {
     throw new Error('Collection options must be an object or a component function');
   }
-  return defineSources(defineTypes(state, options.types), options.sources);
+  const withTypes = defineTypes(state, options.types);
+  const withSources = defineSources(withTypes, options.sources);
+  const withValues = defineSnapshotConfig(withSources, options.snapshot); 
+  const withSorting = defineSorting(withValues, options.orderBy);
+  
+  return withSorting;
 }
 
 function applyDefaultComponentType(state, ...args) {
@@ -171,14 +227,47 @@ export class Collection
     return this.state.get('types', emptyOrderedMap).keySeq().first();
   }
 
+  _sort(state, force) {
+    const orderBy = this.state.get('orderBy');
+    if(!orderBy) {
+      return state;
+    }
+    if(!force && state.get('pending', emptyMap).size) {
+      return state;
+    }
+    
+    if(state.has('snapshot')) {
+      const values = state.getIn(['snapshot', 'values'], emptyMap);
+      return state.update('items', items => {
+        return items.sortBy((v, key) => [key, values.get(key, emptyMap)], orderBy);
+      });
+    }
+    
+    return state.update('items', items => items.sort(orderBy));
+  }
+
   get size() {
     return this.state.get('items').size;
+  }
+
+  get isDataPending() {
+    return this.state.get('pending').size > 0;
+  }
+
+  get snapshot() {
+    const state = this.get('snapshot');
+    return state ? new Snapshot(state) : Snapshot.create();
   }
 
   define() {
     const [typeKey, type] = defineComponent(...arguments);
     const nextState = this.state.setIn(['types', typeKey], type);
     return new Collection(nextState);
+  }
+
+  orderBy(comparator, forceSortNow) {
+    const state = this._sort(defineSorting(this.state, comparator), forceSortNow);
+    return new Collection(state);
   }
 
   add() {
@@ -258,6 +347,11 @@ export class Collection
 
   clear() {
     const state = this.state.set('items', emptyOrderedMap);
+    return new Collection(state);
+  }
+
+  updateSnapshot(snapshot) {
+    const state = this._sort(this.state.set('snapshot', snapshot.state));
     return new Collection(state);
   }
 
