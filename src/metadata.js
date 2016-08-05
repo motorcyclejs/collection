@@ -2,9 +2,6 @@ import most from 'most';
 import hold from '@most/hold';
 import dispatch from 'most-dispatch';
 
-import {Collection} from './collection';
-import {switchCollection} from './switch-collection';
-
 function selectKey(event) {
   return event.key;
 }
@@ -29,42 +26,48 @@ function selectListCount(list) {
   return list.size;
 }
 
-function emitMetadata(key, dispatch$) {
-  // count$
-  // index$
-  // previousSibling$
-  // nextSibling$
-
-  const metadata$ = dispatch$.select(key).multicast();
+function getItem(index) {
+  return event => {
+    if(!event || index >= event.list.size) {
+      return null;
+    }
+    const item = event.list.getAt(index);
+    return {key: item.key, sinks: item.sinks};
+  };
 }
 
-class MetadataBuilder
+export class MetadataBuilder
 {
-  constructor(list$, dispatchByKey$, dispatchByIndex$) {
-    this.list$ = list$;
-    this.total$ = list$
+  constructor(collection$, switched$) {
+    this._total$ = collection$
       .map(selectListCount)
       .skipRepeats()
       .thru(hold); 
-    this.dispatchByKey$ = dispatchByKey$;
-    this.dispatchByIndex$ = dispatchByIndex$;
+
+    const change$ = switched$
+      .changes()
+      .multicast();
+
+    this._dispatchByKey$ = change$
+      .thru(dispatch(selectKey));
+    
+    this._dispatchByIndex$ = change$
+      .filter(hasIndex)
+      .thru(dispatch(selectIndex));
   }
 
-  create(list, key, index) {
-    const indexChanged$ = this.dispatchByKey$
+  create(key, index) {
+    const indexChanged$ = this._dispatchByKey$
       .select(key)
       .filter(hasDiffIndex)
       .multicast();
 
-    
     const index$ = indexChanged$
       .map(selectDiffIndex)
       .startWith(index)
       .thru(hold);
 
-    // if my index changes, reselect both siblings
-    // if the item at the previous index changes, reselect the previous sibling
-    // if the item at the next index changes, reselect the next sibling
+    const skip = Symbol('skip');
 
     const siblings$ = indexChanged$
       .map(event => {
@@ -72,85 +75,37 @@ class MetadataBuilder
         const prevIndex = index - 1;
         const nextIndex = index + 1;
         
-        const prev$ = prevIndex === -1
+        const prev$ = index === 0
           ? most.just(null)
-          : this.dispatchByIndex$
+          : this._dispatchByIndex$
               .select(prevIndex)
-              // i don't want the changeset here, i want the sinks, and only if they've changed
-              .startWith(event.list.getAt(prevIndex));
+              .filter(event => event.type !== 'removed')
+              .startWith(event)
+              .map(getItem(prevIndex))
+              .startWith(event.list.getAt(prevIndex).sinks);
         
-        const next$ = nextIndex >= event.list.size
-          ? most.just(null)
-          : this.dispatchByIndex$
-              .select(nextIndex)
-              // i don't want the changeset here, i want the sinks, and only if they've changed
-              .startWith(event.list.getAt(nextIndex));
+        const next$ = this._dispatchByIndex$
+          .select(nextIndex)
+          .map(event => event.type === 'removed'
+            ? event.list.size >= nextIndex ? null : skip
+            : event)
+          .filter(arg => arg !== skip)
+          .startWith(event)
+          .map(getItem(nextIndex));
 
         return {prev$, next$};
       });
     
-    const nextSibling$ = siblings$
-      .map((({next$}) => next$))
-      .switch()
-  }
-}
-
-class ListItemMetadata
-{
-  constructor(key, index, count) {
-    this._key = key;
-    this._init = {index, count};
-  }
-}
-
-function update(fn, defaultCollection = Collection()) {
-  return stream$ => {
-    const list$ = stream$
-      .scan(fn, defaultCollection/*.setStream(() => switched$)*/)
-      .skip(1)
-      .thru(hold);
-
-    const changes$ = list$
-      .thru(switchCollection)
-      .changes()
-      .multicast();
+    const previousSibling$ = siblings$
+      .map(({prev$}) => prev$)
+      .switch();
     
-    const dispatchByKey$ = changes$
-      .thru(dispatch(selectKey));
+    const nextSibling$ = siblings$
+      .map(({next$}) => next$)
+      .switch();
 
-    const dispatchByIndex$ = changes$
-      .filter(hasIndex)
-      .thru(dispatch(selectIndex));
+    const total$ = this._total$;
 
-    function prepareListItemMetadata(list, key, index) {
-      
-      const indexChanged$ = dispatchByKey$
-        .select(key)
-        .filter(hasDiffIndex)
-        .multicast();
-
-      const index$ = indexChanged$
-        .map(selectDiffIndex)
-        .startWith(index)
-        .thru(hold);
-
-      const count$ = list$
-        .map(selectListCount)
-        .skipRepeats()
-        .startWith(list.size)
-        .thru(hold);
-      
-      const previousSibling$ = indexChanged$
-        .map(event => {
-          
-        });
-
-        
-
-
-
-    };
-
-    return list$;
-  };
+    return {index$, previousSibling$, nextSibling$, total$};
+  }
 }

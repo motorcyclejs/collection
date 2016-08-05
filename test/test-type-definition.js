@@ -7,7 +7,7 @@ describe('TypeDefinition (defaults)', () => {
   describe('#instantiate()', () => {
     it('should call the component function and return its result by default', () => {
       const type = Object.assign({}, componentTypeDefaults, {fn() { return 'x'; }});
-      assert(type.instantiate(null, type, Collection()) === 'x');
+      assert(type.instantiate({type, collection: Collection()}) === 'x');
     });
 
     it('should merge sources from input -> type -> list', () => {
@@ -19,8 +19,8 @@ describe('TypeDefinition (defaults)', () => {
         sources: typeSources,
         fn(sources) { return sources; }
       });
-      const list = Collection({sources: listSources});
-      assert.deepEqual(type.instantiate(inputSources, type, list), expectedSources);
+      const collection = Collection({sources: listSources});
+      assert.deepEqual(type.instantiate({input: inputSources, type, collection}), expectedSources);
     });
 
     it('should have its result assigned to the item\'s `sinks` property', () => {

@@ -1,19 +1,15 @@
 import most from 'most';
-import hold from '@most/hold';
 import Immutable from 'immutable';
 import {combineArray, combineObject} from './statics';
-import Snapshot from './snapshot';
+import {placeholderSymbol} from './common';
 
 const nextListId = (() => {
   let _id = 0;
   return () => `list-item-${++_id}`;
 })();
 
-function hasValue(value) {
-  return value;
-}
-
 const emptyMap = Immutable.Map();
+const emptySet = Immutable.Set();
 const emptyOrderedMap = Immutable.OrderedMap();
 const defaultCollectionState = Immutable.Map({
   sources: {},
@@ -23,14 +19,23 @@ const defaultCollectionState = Immutable.Map({
 
 export const componentTypeDefaults = {
   fn() { throw new Error('Component function not defined'); },
-  instantiate(input, type, list) {
+  instantiate({key, input, type, collection, index, meta}) {
     const sources = Object.assign({},
-      list.state.get('sources') || {},
+      collection.state.get('sources') || {},
       type.sources || {},
+      meta || {},
       input && typeof input === 'object' ? input : {});
     return this.fn(sources);
   }
 };
+
+function valueOf(data) {
+  return data === placeholderSymbol ? void 0 : data;
+}
+
+function hasValue(value) {
+  return value;
+}
 
 function defineComponent() {
   const arg0 = arguments[0];
@@ -168,6 +173,7 @@ function applyCollectionOptions(state, options) {
   else if(typeof options !== 'object') {
     throw new Error('Collection options must be an object or a component function');
   }
+  
   const withTypes = defineTypes(state, options.types);
   const withSources = defineSources(withTypes, options.sources);
   const withValues = defineSnapshotConfig(withSources, options.snapshot); 
@@ -202,20 +208,28 @@ export class Collection
     return type;
   }
 
-  _runComponent(input, typeKey) {
+  _runComponent(input, typeKey, key, index) {
     const type = this._getType(typeKey, true);
-    const sinks = type.instantiate(input, type, this);
+    const meta = this.state.get('meta');
+    const sinks = type.instantiate({
+      key,
+      input,
+      type,
+      index,
+      collection: this,
+      meta: meta ? meta.create(key, index) : void 0
+    });
     return sinks;
   }
 
-  _createItem(key, type, input, sinks) {
+  _createItem({key, type, input, sinks, index}) {
     if(key === void 0 || key === null) {
       throw new Error('Cannot set list item; no key was specified');
     }
     if(!sinks) {
-      sinks = sinks || this._runComponent(input, type);
+      sinks = sinks || this._runComponent(input, type, key, index);
     }
-    return {key, type, sinks, input};
+    return {key, type, input, sinks};
   }
 
   _setItem(key, item) {
@@ -259,6 +273,11 @@ export class Collection
     return state ? new Snapshot(state) : Snapshot.create();
   }
 
+  setMetadataBuilder(builder) {
+    const state = this.state.set('meta', builder);
+    return new Collection(state);
+  }
+
   define() {
     const [typeKey, type] = defineComponent(...arguments);
     const nextState = this.state.setIn(['types', typeKey], type);
@@ -283,7 +302,7 @@ export class Collection
       input = type;
       type = this._getDefaultTypeKey();
     }
-    const item = this._createItem(key, type, input);
+    const item = this._createItem({key, type, input, index: this.size});
     return this._setItem(key, item);
   }
 
@@ -296,7 +315,7 @@ export class Collection
     if(key === void 0) {
       throw new Error(`Cannot set item at index ${index}; no item exists at that index`);
     }
-    const item = this._createItem(key, type, input);
+    const item = this._createItem({key, type, input, index});
     return this._setItem(key, item);
   }
 
@@ -305,7 +324,7 @@ export class Collection
       sinks = type;
       type = void 0;
     }
-    const item = this._createItem(key, type, void 0, sinks);
+    const item = this._createItem({key, type, sinks, index: this.size});
     return this._setItem(key, item);
   }
 
@@ -318,7 +337,7 @@ export class Collection
     if(key === void 0) {
       throw new Error(`Cannot set item at index ${index}; no item exists at that index`);
     }
-    const item = this._createItem(key, type, void 0, sinks);
+    const item = this._createItem({key, type, sinks, index});
     return this._setItem(key, item);
   }
 
@@ -388,5 +407,147 @@ export class Collection
   [Symbol.iterator]() {
     const items = this.state.get('items');
     return items.values();
+  }
+}
+
+export class Snapshot
+{
+  constructor(state) {
+    this.state = state;
+  }
+
+  static create(sinkKeys) {
+    const state = Immutable.Map({
+      sinkKeys: sinkKeys && Immutable.Set(sinkKeys),
+      pending: emptyMap,
+      values: emptyMap
+    });
+    return new Snapshot(state);
+  }
+
+  get sinkKeys() {
+    return this.state.get('sinkKeys');
+  }
+
+  get hasPendingData() {
+    return this.state.getIn(['pending', 'sinks'], emptySet).size > 0;
+  }
+
+  applyChanges({added, removed, changed}) {
+    const snapshot = new MutableSnapshot(this.state);
+    snapshot.addItems(added);
+    snapshot.updateItems(changed);
+    snapshot.removeItems(removed);
+    return new Snapshot(snapshot.state);
+  }
+  
+  setData([itemKey, sinkKey, data]) {
+    const snapshot = new MutableSnapshot(this.state);
+    snapshot.updateData(itemKey, sinkKey, data);
+    return new Snapshot(snapshot.state);
+  }
+}
+
+class MutableSnapshot
+{
+  constructor(state) {
+    this.state = state;
+  }
+
+  _makeDefaultValues(key, index) {
+    const sinkKeys = this.get('sinkKeys');
+    const values = {key, index};
+    const defaults = sinkKeys ? sinkKeys.reduce((v, k) => (v[k] = void 0, v), values) : values;
+    return Immutable.Map(defaults);
+  }
+
+  addItems(added) {
+    if(!added) return;
+    this.state.update('values', values => {
+      added.forEach(({sinks, index}, itemKey) => {
+        for(let sinkKey in sinks) {
+          this.setSinkPending(itemKey, sinkKey);
+        }
+        values = values.set(itemKey, this._makeDefaultValues(itemKey, index));
+      });
+      return values;
+    });
+  }
+
+  _updateItem(itemKey, changedSinks, index) {
+    if(index !== void 0) {
+      this.state = this.state.setIn(['values', itemKey, 'index'], index);
+    }
+    
+    if(changedSinks) {
+      for(let i = 0; i < changedSinks.length; i++) {
+        const [sinkKey, stream] = changedSinks[i];
+        if(stream) { // stream changed
+          this.setSinkPending(itemKey, sinkKey);
+        }
+        else { // stream removed
+          this.setSinkResolved(itemKey, sinkKey);
+        }
+      }
+    }
+  }
+
+  updateItems(changed) {
+    if(!changed) return;
+    changed.forEach(({sinks, index}, itemKey) =>
+      this._updateItem(itemKey, sinks, index));
+  }
+
+  removeItems(removed) {
+    if(!removed) return;
+    let values = this.state.get('values');
+    for(let key of removed.keys()) {
+      values = values.delete(key);
+      this.state.getIn(['pending', 'items', key])
+        .forEach(sinkKey => this.state.setSinkResolved(key, sinkKey));
+    }
+    this.state = this.state.set('values', values);
+  }
+
+  updateData(itemKey, sinkKey, data) {
+    this.setSinkResolved(itemKey, sinkKey);
+    this.state = this.state.setIn(['values', itemKey, sinkKey], valueOf(data));
+  }
+
+  setSinkPending(itemKey, sinkKey) {
+    this.state = this.state.updateIn(['snapshot', 'pending'], pending => pending
+      .updateIn(['items', itemKey], emptySet, keys => keys.add(sinkKey))
+      .updateIn(['sinks', sinkKey], emptySet, keys => keys.add(itemKey)));
+  }
+
+  setSinkResolved(itemKey, sinkKey) {
+    this.state = this.state
+      .updateIn(['snapshot', 'pending'], pending => {
+        const items = pending
+          .get('items', emptyMap)
+          .update(items => {
+            let sinkKeys = items.get(itemKey);
+            if(!sinkKeys) return items;
+            sinkKeys = sinkKeys.delete(sinkKey);
+            return sinkKeys.size
+              ? items.set(itemKey, sinkKeys)
+              : items.delete(itemKey);
+          });
+
+        const sinks = pending
+          .get('sinks', emptyMap)
+          .update(sinks => {
+            let itemKeys = sinks.get(sinkKey);
+            if(!itemKeys) return sinks;
+            itemKeys = itemKeys.delete(itemKey);
+            return itemKeys.size
+              ? sinks.set(sinkKey, itemKeys)
+              : sinks.delete(sinkKey);
+          });
+        
+        return pending
+          .set('items', items)
+          .set('sinks', sinks);
+      });
   }
 }

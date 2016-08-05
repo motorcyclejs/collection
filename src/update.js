@@ -1,12 +1,11 @@
 import most from 'most';
 import hold from '@most/hold';
-import dispatch from 'most-dispatch';
 
 import {stub} from './common';
-import {isCollection} from './statics';
+import {isCollection, areCollectionItemsEqual} from './statics';
 import {Collection} from './collection';
 import {switchCollection} from './switch-collection';
-import {applyChangeSetData, applySnapshotData} from './snapshot';
+import {MetadataBuilder} from './metadata';
 
 export default function update(fn, collectionArg) {
   const initialCollection = collectionArg
@@ -16,29 +15,39 @@ export default function update(fn, collectionArg) {
     : Collection(); 
   
   return stream => {
+    const collection$ = stub();
+    const switched$ = stub();
     const data$ = stub();
-    const changes$ = stub();
-    const collection$ = most
+    const changeSet$ = stub();
+
+    const builder = new MetadataBuilder(collection$, switched$);
+    
+    const updatedCollection$ = most
       .mergeArray([
         data$.map(createMappingFunction(applySnapshotData)),
-        changes$.map(createMappingFunction(applyChangeSetData)),
+        changeSet$.map(createMappingFunction(applyChangeSetData)),
         stream.map(createMappingFunction(wrapUserFunction(fn)))
       ])
-      .loop(applyChange, initialCollection)
+      .loop(applyChange, initialCollection.setMetadataBuilder(builder))
+      .skipRepeatsWith(areCollectionItemsEqual)
       .multicast();
     
-    const switched$ = collection$
+    const switchedCollection$ = updatedCollection$
       .filter(shouldRecalculate)
       .map(toCollection)
       .thru(switchCollection(initialCollection.snapshot.sinkKeys));
 
-    changes$.fulfill(switched$.changeSets());
-    data$.fulfill(switched$.events());
-
-    return collection$
+    const publishedCollection$ = updatedCollection$
       .filter(shouldPublish)
       .map(toCollection)
       .thru(hold);
+
+    collection$.fulfill(updatedCollection$);
+    switched$.fulfill(switchedCollection$);
+    changeSet$.fulfill(switchedCollection$.changeSets());
+    data$.fulfill(switchedCollection$.events());
+
+    return publishedCollection$;
   };
 }
 
