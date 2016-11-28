@@ -5,6 +5,8 @@
 
 This is a library to make management of collections of child components much easier, and was inspired by [Nick Johnstone](https://github.com/Widdershin)'s excellent [collection](https://github.com/cyclejs/collection) library for [Cycle.js](http://cycle.js.org/) and [xstream](https://github.com/staltz/xstream). It's based on [Most.js](https://github.com/cujojs/most) streams (as are all Motorcycle packages) and while it shares some similarities with [cycle/collection](https://github.com/cyclejs/collection), it was written from scratch as a universal way to manage and combine sets of child components in general, whether they're known about in advance, such as the different sections of a web page, or dynamically changing in length, such as for a live stream of messages.
 
+**Note: this library is fully functional, well-tested and perfectly valid for use in new and existing projects. Ongoing development is on hold though, and will be largely superceded by [Collectable.js](https://github.com/frptools/collectable) and [Salix](https://github.com/frptools/salix), which aim to solve this particular use case at a more fundamental level.**
+
 ## Contents
 
 - [Features](#features)
