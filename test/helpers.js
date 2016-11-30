@@ -1,5 +1,5 @@
 import util from 'util';
-import most from 'most';
+import * as most from 'most';
 
 
 if(!console.inspect) {

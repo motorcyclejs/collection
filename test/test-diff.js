@@ -1,5 +1,5 @@
 import assert from 'power-assert';
-import most from 'most';
+import * as most from 'most';
 import Collection from '../src';
 import {calculateDiff, compareItems, compareSinks} from '../src/diff';
 import {isStream} from './helpers';

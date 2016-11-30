@@ -1,4 +1,4 @@
-import most from 'most';
+import * as most from 'most';
 import hold from '@most/hold';
 import Immutable from 'immutable';
 import {combineArray, combineObject} from './statics';
