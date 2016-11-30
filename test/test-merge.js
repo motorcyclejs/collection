@@ -1,5 +1,5 @@
 import assert from 'power-assert';
-import most from 'most';
+import * as most from 'most';
 import {run} from 'most-test';
 import Collection from '../src';
 

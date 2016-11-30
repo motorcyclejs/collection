@@ -25,7 +25,7 @@
      disposed and removed, and the new one is activated to replace the old one.
 */
 
-import most from 'most';
+import * as most from 'most';
 import Collection from './index';
 import {calculateDiff} from './diff';
 import {placeholderSymbol} from './common';

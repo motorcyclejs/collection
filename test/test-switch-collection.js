@@ -1,5 +1,5 @@
 import assert from 'power-assert';
-import most from 'most';
+import * as most from 'most';
 import Collection from '../src';
 import switchCollection from '../src/switch-collection';
 import {placeholderSymbol} from '../src/common';

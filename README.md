@@ -92,7 +92,7 @@ All of the examples below assume the same basic setup described in this tutorial
 Let's start by creating a very simple application and use a collection just to manage some predefined child components. The component examples below are overly simplistic of course, as we're just demonstrating a concept. In reality, sections of functionality would be broken out into separate components only when there is value to managing them independently.
 
 ```js
-import most from 'most';
+import * as most from 'most';
 import {run} from '@cycle/most-run';
 import {div, h1, header, main, nav, p, makeDOMDriver} from '@motorcycle/dom';
 import Collection from '@motorcycle/collection';

@@ -1,5 +1,5 @@
 import Immutable from 'immutable';
-import most from 'most';
+import * as most from 'most';
 import {isStream, isSinks} from './common';
 import {Collection} from './collection';
 import snapshot from './snapshot';
